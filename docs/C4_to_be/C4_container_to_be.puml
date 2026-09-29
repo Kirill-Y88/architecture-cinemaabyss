@@ -1,0 +1,99 @@
+@startuml C4_container_to_be
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+title Контейнерная диаграмма C4 — целевая архитектура «Кинобездна» (to-be)
+
+Person(user, "Пользователь", "Зритель и администратор контента (веб- и мобильные клиенты). Смотрит каталог, оформляет подписку и управляет контентом; права разграничены ролями IdP и проверяются на шлюзе. Работает только через единую точку входа")
+
+System_Ext(psp, "Платёжный провайдер (эквайринг)", "Приём платежей и возвраты. Интеграция только из домена «Биллинг»")
+System_Ext(cdn, "CDN / объектное хранилище", "Постеры и медиа-файлы фильмов (movies.poster_url)")
+
+Deployment_Node(k8s, "Платформа «Кинобездна» — Kubernetes, namespace cinemaabyss", "Деплой Helm-чартом src/kubernetes/helm; локальная разработка — Docker Compose") {
+
+  Boundary(b_edge, "Домен: доступ к API (Edge)") {
+    Container(ingress, "Ingress Controller", "NGINX Ingress", "Единая точка входа: TLS-терминация, хост cinemaabyss.example.com, маршрутизация на API Gateway")
+    Container(gateway, "API Gateway / BFF", "Go, REST", "Единая точка вызова сервисов: маршрутизация по доменам, валидация JWT, rate limiting, агрегация ответов для UI, фиче-флаги Strangler Fig (MOVIES_MIGRATION_PERCENT)")
+  }
+
+  Boundary(b_identity, "Домен: идентификация и пользователи") {
+    Container(idp, "Identity Provider", "OIDC/OAuth2 (Keycloak)", "Регистрация и вход зрителей, выпуск и ротация JWT, роли")
+    Container(user_service, "User Service", "Go, REST", "Владеет доменом «Пользователи»: профиль, статус подписки клиента (users)")
+  }
+
+  Boundary(b_catalog, "Домен: каталог фильмов") {
+    Container(catalog_service, "Catalog Service", "Go, REST", "Владеет доменом «Фильмы»: карточки фильмов и жанры (movies, movie_genres), отдача каталога и ссылок на постеры")
+  }
+
+  Boundary(b_billing, "Домен: биллинг (платежи и подписки)") {
+    Container(billing_service, "Billing Service", "Go, REST", "Владеет доменом «Билинг»: учёт платежей (payments) и жизненный цикл подписки (subscriptions) в одной БД и одной ACID-транзакции; идемпотентность, эквайринг, продление/отмена")
+  }
+
+  Boundary(b_engagement, "Домен: вовлечённость и аналитика") {
+    Container(engagement_service, "Engagement Service", "Go, REST", "Просмотры и оценки (views, user_ratings), рекомендации; read-модель каталога собирается из событий Kafka (CQRS-lite)")
+  }
+
+  Boundary(b_events, "Домен: события и уведомления") {
+    Container(events_service, "Events Service", "Go, Kafka producer/consumer", "Приём доменных событий: логирование, аудит, уведомления зрителям, журнал обработанных событий (inbox) для идемпотентности")
+  }
+
+  Boundary(b_integration, "Домен: интеграция (event bus)") {
+    ContainerQueue(kafka, "Apache Kafka", "Kafka-брокер (ZooKeeper / KRaft)", "Асинхронная интеграция доменов. Топики: user-events, movie-events, payment-events, subscription-events, view-events. У каждого топика ровно один издатель-владелец")
+    ContainerQueue(zookeeper, "ZooKeeper", "wurstmeister/zookeeper", "Координация брокеров и метаданные топиков (в KRaft-режиме не требуется)")
+  }
+
+  Boundary(b_data, "Домен: данные (database per domain)") {
+    ContainerDb(postgres, "PostgreSQL", "postgres:14", "Кластер БД; отдельная база/схема на домен: users_db, catalog_db, billing_db, engagement_db, events_db")
+  }
+
+  Boundary(b_legacy, "Переходный период: вывод монолита (Strangler Fig)") {
+    Container(monolith, "Monolith (legacy)", "Go 1.23, net/http, lib/pq", "Временно обслуживает домены, ещё не вынесенные в сервисы; после завершения миграции удаляется")
+  }
+}
+
+note bottom of postgres
+  Один физический инстанс, но N логических БД, и у каждой БД ровно один сервис-владелец.
+end note
+
+note right of ingress
+  Ingress — платформенный вход (L7), а не бизнес-домен: TLS-терминация, хост
+  cinemaabyss.example.com, маршрутизация по path на ClusterIP-сервисы.
+  Сам Ingress — только правила (src/kubernetes/ingress.yaml, helm/templates/ingress.yaml);
+  исполняет их контроллер ingress-nginx, который ставится вне чарта приложения
+  (minikube addons enable ingress), поэтому ingress.enabled управляет правилами, а не контроллером.
+  Обязательна единая точка входа, а не именно Ingress: альтернативы — Gateway API,
+  Service type=LoadBalancer, edge-шлюз наружу; в docker-compose входа-контейнера нет вовсе,
+  наружу смотрит proxy-service:8000.
+  Текущий Helm-маршрут: «/» → proxy-service, «/api/events» → events-service напрямую
+  (helm/values.yaml:169-179); по принципу «единая точка вызова» /api/events должен идти через шлюз.
+end note
+
+Rel(user, ingress, "Все вызовы API (единый домен): каталог, профиль, подписка, управление контентом", "REST/JSON over HTTPS")
+Rel(ingress, gateway, "Маршрутизация L7 на единый API-контракт", "HTTP")
+Rel(gateway, idp, "Проверка и валидация JWT по JWKS, получение ролей", "OIDC over HTTPS")
+Rel(gateway, user_service, "/api/users, /api/users/{id} — профили зрителей", "REST/JSON over HTTP")
+Rel(gateway, catalog_service, "/api/movies, /api/movies/{id} — каталог фильмов", "REST/JSON over HTTP")
+Rel(gateway, billing_service, "/api/payments, /api/subscriptions — платежи и подписки одного домена", "REST/JSON over HTTP")
+Rel(gateway, engagement_service, "Просмотры, оценки, рекомендации (read-модель)", "REST/JSON over HTTP")
+
+Rel(billing_service, psp, "Списание и возврат средств, обработка webhooks", "REST/JSON over HTTPS")
+Rel(user_service, idp, "Регистрация и блокировка учётных записей, роли (OIDC Admin API)", "OIDC over HTTPS")
+Rel(catalog_service, cdn, "Отдача ссылок на постеры и медиа", "HTTPS")
+
+Rel(user_service, kafka, "Публикует user-events: профиль создан/изменён/удалён", "Kafka protocol (JSON)")
+Rel(catalog_service, kafka, "Публикует movie-events: фильм добавлен/изменён/снят", "Kafka protocol (JSON)")
+Rel(billing_service, kafka, "Публикует payment-events (проведён/отклонён/возврат) и subscription-events (оформлена/продлена/отменена)", "Kafka protocol (JSON)")
+Rel(engagement_service, kafka, "Публикует view-events: просмотр и оценка фильма", "Kafka protocol (JSON)")
+Rel(kafka, events_service, "Подписка на доменные топики: логирование, аудит, уведомления", "Kafka protocol (JSON)")
+Rel(kafka, engagement_service, "Подписка на user/movie/payment-events: read-модель и аналитика", "Kafka protocol (JSON)")
+Rel(kafka, zookeeper, "Регистрация брокеров, метаданные топиков", "ZooKeeper protocol")
+
+Rel(user_service, postgres, "Владеет БД users_db (таблица users)", "SQL (PostgreSQL protocol)")
+Rel(catalog_service, postgres, "Владеет БД catalog_db (movies, movie_genres)", "SQL (PostgreSQL protocol)")
+Rel(billing_service, postgres, "Владеет БД billing_db (payments, subscriptions)", "SQL (PostgreSQL protocol)")
+Rel(engagement_service, postgres, "Владеет БД engagement_db (views, user_ratings)", "SQL (PostgreSQL protocol)")
+Rel(events_service, postgres, "БД events_db: журнал событий и inbox-таблица идемпотентности", "SQL (PostgreSQL protocol)")
+
+Rel(gateway, monolith, "Домены, ещё не вынесенные из монолита: переключение по фиче-флагу", "REST/JSON over HTTP :8080")
+Rel(monolith, postgres, "Legacy-доступ к общей базе до завершения миграции домена", "SQL (PostgreSQL protocol)")
+
+@enduml
