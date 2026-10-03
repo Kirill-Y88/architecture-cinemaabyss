@@ -1,0 +1,37 @@
+server:
+  port: ${PORT:8082}
+  shutdown: graceful
+
+spring:
+  application:
+    name: events-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+    listener:
+      missing-topics-fatal: false
+
+events:
+  topics:
+    movie: ${EVENTS_MOVIE_TOPIC:movie-events}
+    user: ${EVENTS_USER_TOPIC:user-events}
+    payment: ${EVENTS_PAYMENT_TOPIC:payment-events}
+  consumer:
+    enabled: ${EVENTS_CONSUMER_ENABLED:true}
+    group-id: ${EVENTS_CONSUMER_GROUP_ID:cinemaabyss-events-service}
+  send-timeout: ${EVENTS_SEND_TIMEOUT:10s}
+
+logging:
+  level:
+    com.cinemaabyss.events: INFO
