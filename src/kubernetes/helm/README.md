@@ -166,6 +166,15 @@ helm uninstall cinemaabyss
 | `ingress.className`            | Ingress class name                              | `nginx`         |
 | `ingress.annotations`          | Ingress annotations                             | See values.yaml |
 | `ingress.hosts`                | Ingress hosts configuration                     | See values.yaml |
+| `ingress.tls`                  | TLS configuration (secretName + hosts)          | See values.yaml |
+
+### TLS Parameters
+
+| Name                           | Description                                     | Value           |
+|--------------------------------|-------------------------------------------------|-----------------|
+| `tlsSecret.enabled`            | Create the TLS secret referenced by the ingress | `true`          |
+| `tlsSecret.crt`                | Base64-encoded self-signed certificate (`tls.crt`) | See values.yaml |
+| `tlsSecret.key`                | Base64-encoded private key (`tls.key`)          | See values.yaml |
 
 ### Application Configuration
 
