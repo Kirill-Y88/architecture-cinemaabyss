@@ -60,7 +60,7 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `monolith.enabled`             | Enable monolith deployment                      | `true`          |
-| `monolith.image.repository`    | Monolith image repository                       | `ghcr.io/db-exp/cinemaabysstest/monolith` |
+| `monolith.image.repository`    | Monolith image repository                       | `ghcr.io/kirill-y88/architecture-cinemaabyss/monolith` |
 | `monolith.image.tag`           | Monolith image tag                              | `latest`        |
 | `monolith.image.pullPolicy`    | Monolith image pull policy                      | `Always`        |
 | `monolith.replicas`            | Number of monolith replicas                     | `1`             |
@@ -77,7 +77,7 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `proxyService.enabled`         | Enable proxy service deployment                 | `true`          |
-| `proxyService.image.repository`| Proxy service image repository                  | `ghcr.io/db-exp/cinemaabysstest/proxy-service` |
+| `proxyService.image.repository`| Proxy service image repository                  | `ghcr.io/kirill-y88/architecture-cinemaabyss/proxy-service` |
 | `proxyService.image.tag`       | Proxy service image tag                         | `latest`        |
 | `proxyService.image.pullPolicy`| Proxy service image pull policy                 | `Always`        |
 | `proxyService.replicas`        | Number of proxy service replicas                | `1`             |
@@ -94,7 +94,7 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `moviesService.enabled`        | Enable movies service deployment                | `true`          |
-| `moviesService.image.repository`| Movies service image repository                | `ghcr.io/db-exp/cinemaabysstest/movies-service` |
+| `moviesService.image.repository`| Movies service image repository                | `ghcr.io/kirill-y88/architecture-cinemaabyss/movies-service` |
 | `moviesService.image.tag`      | Movies service image tag                        | `latest`        |
 | `moviesService.image.pullPolicy`| Movies service image pull policy               | `Always`        |
 | `moviesService.replicas`       | Number of movies service replicas               | `1`             |
@@ -111,7 +111,7 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `eventsService.enabled`        | Enable events service deployment                | `true`          |
-| `eventsService.image.repository`| Events service image repository                | `ghcr.io/db-exp/cinemaabysstest/events-service` |
+| `eventsService.image.repository`| Events service image repository                | `ghcr.io/kirill-y88/architecture-cinemaabyss/events-service` |
 | `eventsService.image.tag`      | Events service image tag                        | `latest`        |
 | `eventsService.image.pullPolicy`| Events service image pull policy               | `Always`        |
 | `eventsService.replicas`       | Number of events service replicas               | `1`             |
@@ -166,6 +166,15 @@ helm uninstall cinemaabyss
 | `ingress.className`            | Ingress class name                              | `nginx`         |
 | `ingress.annotations`          | Ingress annotations                             | See values.yaml |
 | `ingress.hosts`                | Ingress hosts configuration                     | See values.yaml |
+| `ingress.tls`                  | TLS configuration (secretName + hosts)          | See values.yaml |
+
+### TLS Parameters
+
+| Name                           | Description                                     | Value           |
+|--------------------------------|-------------------------------------------------|-----------------|
+| `tlsSecret.enabled`            | Create the TLS secret referenced by the ingress | `true`          |
+| `tlsSecret.crt`                | Base64-encoded self-signed certificate (`tls.crt`) | See values.yaml |
+| `tlsSecret.key`                | Base64-encoded private key (`tls.key`)          | See values.yaml |
 
 ### Application Configuration
 

@@ -1,0 +1,24 @@
+server:
+  port: ${PORT:8000}
+  shutdown: graceful
+
+spring:
+  application:
+    name: proxy-service
+  mvc:
+    problemdetails:
+      enabled: false
+
+proxy:
+  monolith-url: ${MONOLITH_URL:http://localhost:8080}
+  movies-service-url: ${MOVIES_SERVICE_URL:http://localhost:8081}
+  events-service-url: ${EVENTS_SERVICE_URL:http://localhost:8082}
+  gradual-migration: ${GRADUAL_MIGRATION:true}
+  movies-migration-percent: ${MOVIES_MIGRATION_PERCENT:50}
+  fallback-to-monolith: ${FALLBACK_TO_MONOLITH:true}
+  connect-timeout: ${UPSTREAM_CONNECT_TIMEOUT:5s}
+  request-timeout: ${UPSTREAM_REQUEST_TIMEOUT:10s}
+
+logging:
+  level:
+    com.cinemaabyss.proxy: INFO
